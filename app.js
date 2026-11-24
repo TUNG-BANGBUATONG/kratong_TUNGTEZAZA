@@ -226,19 +226,22 @@ function upsertKrathongEntity(record, options = { isNewlyLaunched: false }) {
   const lane = Number(record.lane ?? 1) % 4;
   const metrics = getLaneMetrics(lane);
 
-  // Wide, organic scattering across the expanded Vice Beach bay (X: -44..+44, Z: -24..+18)
-  const laneCentersZ = [-20, -9, 2, 13];
+  // Huge organic scattering across the extra-wide Vice Beach bay (X: -70..+70, Z: -38..+26)
   const h1 = hashStringToUnit(record.id + '-z');
   const h2 = hashStringToUnit(record.id + '-x');
+  const h3 = hashStringToUnit(record.id + '-jitter');
+
+  // Spread freely across full 64-unit Z depth instead of tight lanes!
+  const laneBandsZ = [-30, -14, 3, 18];
   const scatteredZ = options.z3D !== undefined
     ? options.z3D
-    : laneCentersZ[lane] + (h1 - 0.5) * 9.5; // Wide +/- 4.75 organic spread per band!
+    : laneBandsZ[lane] + (h1 - 0.5) * 18.0 + (h3 - 0.5) * 6.0;
 
   const initialX3D = options.x3D !== undefined
     ? options.x3D
     : (options.isNewlyLaunched
-        ? (-14 + (Math.random() - 0.5) * 6)
-        : (-42 + h2 * 84));
+        ? (-14 + (Math.random() - 0.5) * 18)
+        : (-68 + h2 * 136));
 
   const startX = options.startX !== undefined
     ? options.startX
@@ -260,9 +263,9 @@ function upsertKrathongEntity(record, options = { isNewlyLaunched: false }) {
     x: startX,
     y: metrics.baseY,
     x3D: initialX3D,
-    z3D: Math.max(-25, Math.min(18.5, scatteredZ)),
+    z3D: Math.max(-38, Math.min(26, scatteredZ)),
     bobPhase: Math.random() * Math.PI * 2,
-    speedMultiplier: 0.75 + Math.random() * 0.45,
+    speedMultiplier: 0.65 + Math.random() * 0.65,
     throwAnim: options.throwAnim || null
   };
 
@@ -772,8 +775,8 @@ function animate() {
       if (!k.throwAnim) {
         const sp = (laneSpeeds3D[k.lane % 4] || 0.016) * (k.speedMultiplier || 1);
         k.x3D = (k.x3D ?? 0) + sp;
-        if (k.x3D > 48) {
-          k.x3D = -48;
+        if (k.x3D > 72) {
+          k.x3D = -72;
         }
       }
     }
@@ -854,16 +857,9 @@ function initBuilderUI() {
     updatePreviewSummaryText();
   });
 
-  // Random sample wish button
+  // Wish character counter
   const wishTextarea = document.getElementById('wishMessage');
   const charCountEl = document.getElementById('charCount');
-
-  document.getElementById('btnSampleWish').addEventListener('click', () => {
-    if (window.retroAudio) window.retroAudio.playClickSfx();
-    const sample = window.SAMPLE_WISHES[Math.floor(Math.random() * window.SAMPLE_WISHES.length)];
-    wishTextarea.value = sample;
-    charCountEl.textContent = sample.length;
-  });
 
   wishTextarea.addEventListener('input', () => {
     charCountEl.textContent = wishTextarea.value.length;
@@ -1029,11 +1025,11 @@ document.getElementById('krathongForm').addEventListener('submit', async (e) => 
   submitBtn.disabled = true;
   submitBtn.textContent = '🌊 กำลังปล่อยกระทงลงน้ำ...';
 
-  // Direct launch lands with organic spread in the chosen depth band of the wide river
-  const laneZList = [-20, -9, 2, 13];
-  const targetZ = (laneZList[payload.lane % 4] ?? 2) + (Math.random() - 0.5) * 6.5;
-  const targetX3D = -12 + (Math.random() - 0.5) * 14;
-  const landingPxX = ((targetX3D / 92) + 0.5) * Math.max(800, window.innerWidth);
+  // Direct launch lands with wide organic spread across the huge bay
+  const laneZList = [-30, -14, 3, 18];
+  const targetZ = Math.max(-38, Math.min(26, (laneZList[payload.lane % 4] ?? 3) + (Math.random() - 0.5) * 14.0));
+  const targetX3D = -14 + (Math.random() - 0.5) * 32;
+  const landingPxX = ((targetX3D / 140) + 0.5) * Math.max(800, window.innerWidth);
 
   await saveAndSpawnKrathong(payload, {
     landingPxX,
@@ -1042,13 +1038,13 @@ document.getElementById('krathongForm').addEventListener('submit', async (e) => 
     power: 0.45,
     throwAnim: {
       startTime: performance.now(),
-      durationMs: 700,
+      durationMs: 740,
       startX: -14.0,
       startY: 2.3,
-      startZ: 20.5,
+      startZ: 30.5,
       endX: targetX3D,
       endZ: targetZ,
-      peakHeight: 4.2
+      peakHeight: 5.0
     }
   });
 
@@ -1071,7 +1067,7 @@ if (btnAimThrow) {
     state.throwMode.power = 0.5;
     state.throwMode.draftPayload = payload;
     state.throwMode.aimX3D = -4;
-    state.throwMode.aimZ3D = [-20, -9, 2, 13][payload.lane % 4] ?? 2;
+    state.throwMode.aimZ3D = [-30, -14, 3, 18][payload.lane % 4] ?? 3;
 
     builderModal.classList.add('hidden');
     throwHudEl.classList.remove('hidden');
@@ -1094,17 +1090,17 @@ async function execute3DThrow(powerValue = 0.65) {
   const payload = { ...state.throwMode.draftPayload };
 
   const pierX = -14.0;
-  const pierZ = 20.5;
+  const pierZ = 30.5;
 
-  // Compute landing 3D coordinates anywhere across the wide river
+  // Compute landing 3D coordinates anywhere across the extra-wide bay
   const dirX = state.throwMode.aimX3D - pierX;
   const dirZ = state.throwMode.aimZ3D - pierZ;
   const boost = 0.65 + powerValue * 0.55;
-  const endX = Math.max(-38, Math.min(38, pierX + dirX * boost));
-  const endZ = Math.max(-24, Math.min(18, pierZ + dirZ * boost));
+  const endX = Math.max(-64, Math.min(64, pierX + dirX * boost));
+  const endZ = Math.max(-38, Math.min(26, pierZ + dirZ * boost));
 
   // Pick closest river band index (0..3) for database record, while keeping exact organic endZ!
-  const laneZList = [-20, -9, 2, 13];
+  const laneZList = [-30, -14, 3, 18];
   let bestLane = 1;
   let bestDist = 999;
   laneZList.forEach((lz, idx) => {
@@ -1116,8 +1112,8 @@ async function execute3DThrow(powerValue = 0.65) {
   });
   payload.lane = bestLane;
 
-  const landingPxX = ((endX / 92) + 0.5) * Math.max(800, window.innerWidth);
-  const peakHeight = 4.6 + powerValue * 6.0;
+  const landingPxX = ((endX / 140) + 0.5) * Math.max(800, window.innerWidth);
+  const peakHeight = 5.2 + powerValue * 6.5;
 
   exitThrowMode();
 
@@ -1128,7 +1124,7 @@ async function execute3DThrow(powerValue = 0.65) {
     power: powerValue,
     throwAnim: {
       startTime: performance.now(),
-      durationMs: 740,
+      durationMs: 760,
       startX: pierX,
       startY: 2.4,
       startZ: pierZ,

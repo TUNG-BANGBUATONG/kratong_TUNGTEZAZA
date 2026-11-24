@@ -36,12 +36,12 @@ const CANDLE_COLORS = {
   double: '#ffb300'
 };
 
-// Wide Vice Beach bay lanes (expanded so krathongs scatter freely!)
-const LANE_Z = [-20, -9, 2, 13];
+// Extra-Wide Vice Beach bay bands (massive open ocean/bay so krathongs scatter freely!)
+const LANE_Z = [-30, -14, 3, 18];
 
 function mapXTo3D(px) {
   const w = Math.max(800, window.innerWidth);
-  return ((px / w) - 0.5) * 92;
+  return ((px / w) - 0.5) * 140;
 }
 
 function getKrathongWorldPos(entity) {
@@ -399,16 +399,16 @@ function VoxelThrowTrajectory() {
   const tm = window.loyState && window.loyState.throwMode;
   if (!tm || !tm.active) return null;
 
-  // Connected South Pier tip coordinates on the expanded wide bay
+  // Connected South Pier tip coordinates on the extra-wide bay
   const startX = -14.0;
   const startY = 2.4;
-  const startZ = 20.5;
+  const startZ = 30.5;
 
   const power = tm.charging ? tm.power : 0.65;
   const boost = 0.65 + power * 0.55;
-  const endX = Math.max(-38, Math.min(38, startX + (tm.aimX3D - startX) * boost));
-  const endZ = Math.max(-24, Math.min(18, startZ + (tm.aimZ3D - startZ) * boost));
-  const peakH = 4.6 + power * 6.0;
+  const endX = Math.max(-64, Math.min(64, startX + (tm.aimX3D - startX) * boost));
+  const endZ = Math.max(-38, Math.min(26, startZ + (tm.aimZ3D - startZ) * boost));
+  const peakH = 5.2 + power * 6.5;
 
   const dots = [];
   const steps = 14;
@@ -785,10 +785,10 @@ function VoxelSwimmingDuck({ startX = 0, z = 4, speed = 1.2, phase = 0, isBaby =
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
     if (groupRef.current) {
-      const range = 38;
-      const x = ((startX + t * speed + range / 2) % range) - range / 2;
+      const range = 128;
+      const x = ((startX + t * speed + range * 10) % range) - range / 2;
       const bob = Math.sin(t * 3.5 + phase) * 0.08;
-      groupRef.current.position.set(x, 0.1 + bob, z + Math.sin(t * 0.9 + phase) * 0.5);
+      groupRef.current.position.set(x, 0.1 + bob, z + Math.sin(t * 0.9 + phase) * 0.65);
       groupRef.current.rotation.z = Math.sin(t * 3 + phase) * 0.08;
     }
   });
@@ -839,8 +839,8 @@ function VoxelCapybara({ startX = -10, z = -6, speed = 0.75 }) {
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
     if (groupRef.current) {
-      const range = 44;
-      const x = ((startX + t * speed + range / 2) % range) - range / 2;
+      const range = 130;
+      const x = ((startX + t * speed + range * 10) % range) - range / 2;
       groupRef.current.position.set(x, 0.08 + Math.sin(t * 2.2) * 0.07, z);
     }
   });
@@ -911,10 +911,10 @@ function VoxelFloatingPet({
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
     if (groupRef.current) {
-      const range = 52;
-      const x = ((startX + t * speed + range / 2) % range) - range / 2;
+      const range = 132;
+      const x = ((startX + t * speed + range * 10) % range) - range / 2;
       const bob = Math.sin(t * 2.8 + phase) * 0.1;
-      const swayZ = Math.sin(t * 0.75 + phase) * 0.45;
+      const swayZ = Math.sin(t * 0.75 + phase) * 0.65;
       groupRef.current.position.set(x, 0.08 + bob, z + swayZ);
       groupRef.current.rotation.z = Math.sin(t * 2.2 + phase) * 0.06;
       groupRef.current.rotation.x = Math.cos(t * 1.9 + phase) * 0.04;
@@ -1158,7 +1158,7 @@ function VoxelShark({ startX = 0, z = -3.5, speed = 2.6, dir = 1, scale = 1.0, p
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
     if (groupRef.current) {
-      const range = 62;
+      const range = 134;
       const raw = (startX + t * speed * dir + range * 10) % range;
       const x = raw - range / 2;
       const zSway = Math.sin(t * 1.4 + phase) * 1.1;
@@ -1250,7 +1250,7 @@ function VoxelDolphin({ startX = 0, z = 1.5, speed = 3.1, dir = 1, bodyColor = '
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
     if (groupRef.current) {
-      const range = 58;
+      const range = 130;
       const raw = (startX + t * speed * dir + range * 10) % range;
       const x = raw - range / 2;
 
@@ -1344,36 +1344,52 @@ function VoxelDolphin({ startX = 0, z = 1.5, speed = 3.1, dir = 1, bodyColor = '
 }
 
 function VoxelCuteAnimals() {
-  // 16 Floating Dogs & Cats cruising down the Vice Beach River!
+  // 30 Floating Dogs & Cats cruising across the massive Vice Beach Bay!
   const floatingPets = useMemo(() => [
-    // Row / Depth Z ~ 9.5 (Close foreground near pier)
-    { species: 'dog', floatType: 'flamingo', fur: '#e69b45', acc: '#fff8e7', shades: true, x: -20, z: 9.6, speed: 0.95, phase: 0.2 }, // Shiba on Flamingo
-    { species: 'cat', floatType: 'lotus_vice', fur: '#ffffff', acc: '#ff9e64', shades: false, x: -6, z: 9.8, speed: 0.92, phase: 1.4 }, // Calico Cat on Neon Lotus
-    { species: 'dog', floatType: 'surfboard', fur: '#f4a261', acc: '#ffffff', shades: true, x: 8, z: 9.4, speed: 1.05, phase: 2.7 }, // Corgi surfing!
-    { species: 'cat', floatType: 'donut', fur: '#ff9800', acc: '#fff3e0', shades: false, x: 21, z: 9.7, speed: 0.90, phase: 3.9 }, // Orange Cat on Donut
+    // Band 1: Foreground near Pier (Z ~ +16 to +24)
+    { species: 'dog', floatType: 'flamingo', fur: '#e69b45', acc: '#fff8e7', shades: true, x: -55, z: 22.5, speed: 1.05, phase: 0.2 },
+    { species: 'cat', floatType: 'lotus_vice', fur: '#ffffff', acc: '#ff9e64', shades: false, x: -34, z: 18.2, speed: 0.98, phase: 1.4 },
+    { species: 'dog', floatType: 'surfboard', fur: '#f4a261', acc: '#ffffff', shades: true, x: -12, z: 21.0, speed: 1.12, phase: 2.7 },
+    { species: 'cat', floatType: 'donut', fur: '#ff9800', acc: '#fff3e0', shades: false, x: 11, z: 17.5, speed: 0.94, phase: 3.9 },
+    { species: 'dog', floatType: 'lotus_vice', fur: '#ffffff', acc: '#00f5d4', shades: true, x: 33, z: 23.0, speed: 1.02, phase: 4.8 },
+    { species: 'cat', floatType: 'flamingo', fur: '#37474f', acc: '#ff2a85', shades: true, x: 54, z: 19.2, speed: 0.96, phase: 5.5 },
 
-    // Row / Depth Z ~ 5.5
-    { species: 'cat', floatType: 'flamingo', fur: '#212121', acc: '#00f5d4', shades: true, x: -24, z: 5.8, speed: 0.82, phase: 0.9 }, // Cool Black Cat on Flamingo
-    { species: 'dog', floatType: 'lotus_vice', fur: '#f5deb3', acc: '#d4a373', shades: false, x: -11, z: 5.5, speed: 0.85, phase: 2.1 }, // Golden Retriever on Lotus
-    { species: 'cat', floatType: 'surfboard', fur: '#fce4ec', acc: '#ff2a85', shades: true, x: 3, z: 5.9, speed: 0.88, phase: 3.3 }, // Pink Kitty surfing
-    { species: 'dog', floatType: 'donut', fur: '#455a64', acc: '#eceff1', shades: false, x: 16, z: 5.4, speed: 0.80, phase: 4.5 }, // Husky on Cyan Donut
+    // Band 2: Mid-Front (Z ~ +5 to +13)
+    { species: 'cat', floatType: 'flamingo', fur: '#212121', acc: '#00f5d4', shades: true, x: -58, z: 11.4, speed: 0.88, phase: 0.9 },
+    { species: 'dog', floatType: 'lotus_vice', fur: '#f5deb3', acc: '#d4a373', shades: false, x: -38, z: 6.5, speed: 0.91, phase: 2.1 },
+    { species: 'cat', floatType: 'surfboard', fur: '#fce4ec', acc: '#ff2a85', shades: true, x: -18, z: 12.6, speed: 0.95, phase: 3.3 },
+    { species: 'dog', floatType: 'donut', fur: '#455a64', acc: '#eceff1', shades: false, x: 4, z: 7.8, speed: 0.85, phase: 4.5 },
+    { species: 'cat', floatType: 'lotus_vice', fur: '#ffb703', acc: '#ffffff', shades: false, x: 25, z: 10.9, speed: 0.89, phase: 1.7 },
+    { species: 'dog', floatType: 'flamingo', fur: '#8d5524', acc: '#ffe0b2', shades: true, x: 48, z: 5.4, speed: 0.93, phase: 2.9 },
 
-    // Row / Depth Z ~ -0.8 (Mid river)
-    { species: 'dog', floatType: 'lotus_vice', fur: '#d49a5a', acc: '#3e2723', shades: false, x: -17, z: -0.8, speed: 0.74, phase: 1.1 }, // Pug on Lotus Krathong
-    { species: 'cat', floatType: 'donut', fur: '#fff8e7', acc: '#5d4037', shades: false, x: -3, z: -1.1, speed: 0.76, phase: 2.5 }, // Siamese Cat on Donut
-    { species: 'dog', floatType: 'flamingo', fur: '#ffffff', acc: '#ff80ab', shades: true, x: 12, z: -0.6, speed: 0.78, phase: 3.8 }, // White Poodle on Flamingo
-    { species: 'cat', floatType: 'lotus_vice', fur: '#cfd8dc', acc: '#455a64', shades: false, x: 24, z: -1.0, speed: 0.72, phase: 5.0 }, // British Shorthair on Lotus
+    // Band 3: Center Bay (Z ~ -7 to +2)
+    { species: 'dog', floatType: 'lotus_vice', fur: '#d49a5a', acc: '#3e2723', shades: false, x: -60, z: -2.2, speed: 0.78, phase: 1.1 },
+    { species: 'cat', floatType: 'donut', fur: '#fff8e7', acc: '#5d4037', shades: false, x: -40, z: 1.8, speed: 0.82, phase: 2.5 },
+    { species: 'dog', floatType: 'flamingo', fur: '#ffffff', acc: '#ff80ab', shades: true, x: -20, z: -5.4, speed: 0.84, phase: 3.8 },
+    { species: 'cat', floatType: 'lotus_vice', fur: '#cfd8dc', acc: '#455a64', shades: false, x: 2, z: 0.6, speed: 0.76, phase: 5.0 },
+    { species: 'dog', floatType: 'surfboard', fur: '#e6a85c', acc: '#ffffff', shades: true, x: 24, z: -4.1, speed: 0.86, phase: 0.4 },
+    { species: 'cat', floatType: 'flamingo', fur: '#ff9800', acc: '#ffd166', shades: true, x: 46, z: 1.2, speed: 0.80, phase: 1.9 },
 
-    // Row / Depth Z ~ -7.5 (Far river near Ocean Drive)
-    { species: 'cat', floatType: 'flamingo', fur: '#ffb703', acc: '#ffffff', shades: true, x: -21, z: -7.6, speed: 0.64, phase: 0.6 },
-    { species: 'dog', floatType: 'surfboard', fur: '#8d5524', acc: '#ffe0b2', shades: false, x: -8, z: -8.0, speed: 0.68, phase: 1.9 },
-    { species: 'cat', floatType: 'lotus_vice', fur: '#ffffff', acc: '#00f5d4', shades: false, x: 6, z: -7.4, speed: 0.62, phase: 3.1 },
-    { species: 'dog', floatType: 'flamingo', fur: '#e6a85c', acc: '#ffffff', shades: true, x: 19, z: -7.8, speed: 0.66, phase: 4.4 }
+    // Band 4: Mid-Far (Z ~ -21 to -11)
+    { species: 'cat', floatType: 'flamingo', fur: '#ffb703', acc: '#ffffff', shades: true, x: -52, z: -15.6, speed: 0.72, phase: 0.6 },
+    { species: 'dog', floatType: 'surfboard', fur: '#8d5524', acc: '#ffe0b2', shades: false, x: -30, z: -19.8, speed: 0.75, phase: 1.9 },
+    { species: 'cat', floatType: 'lotus_vice', fur: '#ffffff', acc: '#00f5d4', shades: false, x: -8, z: -13.2, speed: 0.70, phase: 3.1 },
+    { species: 'dog', floatType: 'flamingo', fur: '#e6a85c', acc: '#ffffff', shades: true, x: 14, z: -18.5, speed: 0.74, phase: 4.4 },
+    { species: 'cat', floatType: 'donut', fur: '#212121', acc: '#ff2a85', shades: true, x: 36, z: -12.4, speed: 0.69, phase: 2.3 },
+    { species: 'dog', floatType: 'lotus_vice', fur: '#f5e6ca', acc: '#c49a6c', shades: false, x: 58, z: -17.0, speed: 0.73, phase: 5.1 },
+
+    // Band 5: Deep North Bay near Ocean Drive (Z ~ -34 to -25)
+    { species: 'dog', floatType: 'donut', fur: '#f4a261', acc: '#ffffff', shades: false, x: -56, z: -29.0, speed: 0.64, phase: 1.3 },
+    { species: 'cat', floatType: 'surfboard', fur: '#ffffff', acc: '#ff2a85', shades: true, x: -32, z: -33.2, speed: 0.68, phase: 2.8 },
+    { species: 'dog', floatType: 'flamingo', fur: '#455a64', acc: '#eceff1', shades: true, x: -10, z: -26.5, speed: 0.62, phase: 4.0 },
+    { species: 'cat', floatType: 'lotus_vice', fur: '#ffe0b2', acc: '#e65100', shades: false, x: 12, z: -31.8, speed: 0.66, phase: 0.7 },
+    { species: 'dog', floatType: 'lotus_vice', fur: '#6d4c41', acc: '#d7ccc8', shades: false, x: 34, z: -27.4, speed: 0.63, phase: 3.5 },
+    { species: 'cat', floatType: 'flamingo', fur: '#fce4ec', acc: '#00f5d4', shades: true, x: 56, z: -32.0, speed: 0.67, phase: 4.9 }
   ], []);
 
   return html`
     <group>
-      <!-- 0. Fleet of Cute Dogs & Cats Floating in the River! -->
+      <!-- 0. Massive Fleet of 30 Cute Dogs & Cats Floating Across the Wide Bay! -->
       ${floatingPets.map((pet, idx) => html`
         <${VoxelFloatingPet}
           key=${'fpet-' + idx}
@@ -1389,8 +1405,8 @@ function VoxelCuteAnimals() {
         />
       `)}
 
-      <!-- 1 & 2. Cute Dogs & Cats on the Expanded South Pier & Promenade (Z + 8) -->
-      <group position=${[0, 0, 8]}>
+      <!-- 1 & 2. Cute Dogs & Cats on the Extra-Wide South Pier & Promenade (Z + 18) -->
+      <group position=${[0, 0, 18]}>
         <${VoxelDog} position=${[-12.2, 1.4, 13.6]} rotationY=${Math.PI + 0.4} furColor="#e6a85c" earColor="#8d5524" phase=${0.3} />
         <${VoxelCat} position=${[-16.1, 1.4, 13.2]} rotationY=${Math.PI - 0.5} furColor="#ffffff" accentColor="#ff9800" phase=${1.1} />
         <${VoxelDog} position=${[-16.0, 1.4, 16.8]} rotationY=${Math.PI - 0.2} furColor="#f5deb3" earColor="#c49a6c" phase=${1.9} />
@@ -1410,8 +1426,8 @@ function VoxelCuteAnimals() {
         <${VoxelDog} position=${[21.0, 1.4, 20.9]} rotationY=${Math.PI + 0.1} furColor="#d49a5a" earColor="#8d5524" phase=${2.8} />
       </group>
 
-      <!-- 3. Dogs & Cats watching from the Expanded North Ocean Drive Riverbank (Z - 11) -->
-      <group position=${[0, 0, -11]}>
+      <!-- 3. Dogs & Cats watching from the Extra-Wide North Ocean Drive Riverbank (Z - 24) -->
+      <group position=${[0, 0, -24]}>
         <${VoxelDog} position=${[-18.0, 1.4, -21.0]} rotationY=${0.2} furColor="#f5deb3" earColor="#a1887f" phase=${0.8} />
         <${VoxelDog} position=${[-13.5, 1.4, -21.0]} rotationY=${0.3} furColor="#d49a5a" earColor="#795548" phase=${2.1} />
         <${VoxelCat} position=${[-7.5, 1.4, -21.0]} rotationY=${-0.1} furColor="#ff9800" accentColor="#fff3e0" phase=${1.9} />
@@ -1420,19 +1436,30 @@ function VoxelCuteAnimals() {
         <${VoxelDog} position=${[19.0, 1.4, -21.0]} rotationY=${-0.25} furColor="#e69b45" earColor="#8d5524" phase=${3.3} />
       </group>
 
-      <!-- 4. Mother Duck + Ducklings & Chill Capybara Swimming in the River! -->
-      <${VoxelSwimmingDuck} startX=${-14} z=${3.4} speed=${1.1} phase=${0} isBaby=${false} />
-      <${VoxelSwimmingDuck} startX=${-15.2} z=${3.6} speed=${1.1} phase=${0.8} isBaby=${true} />
-      <${VoxelSwimmingDuck} startX=${-16.2} z=${3.2} speed=${1.1} phase=${1.6} isBaby=${true} />
-      <${VoxelCapybara} startX=${2} z=${-4.2} speed=${0.68} />
+      <!-- 4. Two Families of Swimming Ducks + 3 Chill Capybaras Floating Across the Bay! -->
+      <${VoxelSwimmingDuck} startX=${-28} z=${14.2} speed=${1.15} phase=${0} isBaby=${false} />
+      <${VoxelSwimmingDuck} startX=${-29.4} z=${14.5} speed=${1.15} phase=${0.8} isBaby=${true} />
+      <${VoxelSwimmingDuck} startX=${-30.6} z=${14.0} speed=${1.15} phase=${1.6} isBaby=${true} />
+      <${VoxelSwimmingDuck} startX=${22} z=${-8.6} speed=${1.05} phase=${2.1} isBaby=${false} />
+      <${VoxelSwimmingDuck} startX=${20.6} z=${-8.3} speed=${1.05} phase=${2.9} isBaby=${true} />
+      <${VoxelSwimmingDuck} startX=${19.4} z=${-8.8} speed=${1.05} phase=${3.7} isBaby=${true} />
+      <${VoxelSwimmingDuck} startX=${-4} z=${-23.2} speed=${0.95} phase=${4.2} isBaby=${false} />
 
-      <!-- 5. Cruising Voxel Sharks (ปลาฉลามว่ายโชว์ครีบ) & Leaping Dolphins (ปลาโลมากระโดดน้ำ) -->
-      <${VoxelShark} startX=${-12} z=${-5.5} speed=${2.5} dir=${1} scale=${1.15} phase=${0.2} />
-      <${VoxelShark} startX=${16} z=${7.6} speed=${2.2} dir=${-1} scale=${0.92} phase=${2.4} />
+      <${VoxelCapybara} startX=${-36} z=${-6.2} speed=${0.72} />
+      <${VoxelCapybara} startX=${6} z=${8.5} speed=${0.68} />
+      <${VoxelCapybara} startX=${42} z=${-22.4} speed=${0.64} />
 
-      <${VoxelDolphin} startX=${-6} z=${1.6} speed=${3.1} dir=${1} bodyColor="#29b6f6" bellyColor="#e1f5fe" phase=${0.0} />
-      <${VoxelDolphin} startX=${-9} z=${2.8} speed=${3.1} dir=${1} bodyColor="#4fc3f7" bellyColor="#ffffff" phase=${0.55} />
-      <${VoxelDolphin} startX=${14} z=${-2.6} speed=${2.85} dir=${-1} bodyColor="#ff80ab" bellyColor="#fce4ec" phase=${1.4} />
+      <!-- 5. 4 Cruising Voxel Sharks & 5 Leaping Dolphins Across the Expansive Waters! -->
+      <${VoxelShark} startX=${-34} z=${-10.5} speed=${2.6} dir=${1} scale=${1.18} phase=${0.2} />
+      <${VoxelShark} startX=${26} z=${15.2} speed=${2.3} dir=${-1} scale=${0.95} phase=${2.4} />
+      <${VoxelShark} startX=${-10} z=${-28.5} speed=${2.8} dir=${1} scale=${1.1} phase=${1.3} />
+      <${VoxelShark} startX=${48} z=${2.8} speed=${2.4} dir=${-1} scale=${1.0} phase=${3.8} />
+
+      <${VoxelDolphin} startX=${-24} z=${3.6} speed=${3.2} dir=${1} bodyColor="#29b6f6" bellyColor="#e1f5fe" phase=${0.0} />
+      <${VoxelDolphin} startX=${-27.5} z=${5.0} speed=${3.2} dir=${1} bodyColor="#4fc3f7" bellyColor="#ffffff" phase=${0.55} />
+      <${VoxelDolphin} startX=${18} z=${-14.6} speed=${2.9} dir=${-1} bodyColor="#ff80ab" bellyColor="#fce4ec" phase=${1.4} />
+      <${VoxelDolphin} startX=${38} z=${11.2} speed=${3.0} dir=${-1} bodyColor="#00f5d4" bellyColor="#e0f7fa" phase=${2.2} />
+      <${VoxelDolphin} startX=${-46} z=${-24.0} speed=${3.1} dir=${1} bodyColor="#ff80ab" bellyColor="#ffffff" phase=${3.0} />
     </group>
   `;
 }
@@ -1459,13 +1486,13 @@ function VoxelFestivalCrowd() {
     { pos: [16.2, 1.4, 21.1], rot: Math.PI - 0.25, shirt: '#ef5350', pants: '#212121', hold: true, phase: 4.2 },
     { pos: [23.0, 1.4, 21.0], rot: Math.PI, shirt: '#29b6f6', pants: '#263238', hold: false, phase: 1.1 },
 
-    // 3. People across the river on the Expanded North City Promenade (Z = -40 + 8 = -32) facing South (rot = 0)
-    { pos: [-20, 1.4, -40.0], rot: 0, shirt: '#ff4081', pants: '#1a237e', hold: true, phase: 0.5 },
-    { pos: [-11, 1.4, -40.0], rot: 0.2, shirt: '#ffd740', pants: '#212121', hold: false, phase: 1.7 },
-    { pos: [-4, 1.4, -40.0], rot: -0.1, shirt: '#00e5ff', pants: '#263238', hold: true, phase: 2.9 },
-    { pos: [6, 1.4, -40.0], rot: 0, shirt: '#69f0ae', pants: '#1a237e', hold: false, phase: 3.4 },
-    { pos: [15, 1.4, -40.0], rot: -0.2, shirt: '#ff80ab', pants: '#fff8e1', hold: true, phase: 1.3 },
-    { pos: [24, 1.4, -40.0], rot: 0.1, shirt: '#ffa726', pants: '#212121', hold: false, phase: 2.2 }
+    // 3. People across the river on the Extra-Wide North City Promenade (Z = -63 + 18 = -45) facing South (rot = 0)
+    { pos: [-20, 1.4, -63.0], rot: 0, shirt: '#ff4081', pants: '#1a237e', hold: true, phase: 0.5 },
+    { pos: [-11, 1.4, -63.0], rot: 0.2, shirt: '#ffd740', pants: '#212121', hold: false, phase: 1.7 },
+    { pos: [-4, 1.4, -63.0], rot: -0.1, shirt: '#00e5ff', pants: '#263238', hold: true, phase: 2.9 },
+    { pos: [6, 1.4, -63.0], rot: 0, shirt: '#69f0ae', pants: '#1a237e', hold: false, phase: 3.4 },
+    { pos: [15, 1.4, -63.0], rot: -0.2, shirt: '#ff80ab', pants: '#fff8e1', hold: true, phase: 1.3 },
+    { pos: [24, 1.4, -63.0], rot: 0.1, shirt: '#ffa726', pants: '#212121', hold: false, phase: 2.2 }
   ], []);
 
   return html`
@@ -1509,23 +1536,23 @@ function Voxel360SurroundingCity() {
     { x: 24, roof1: '#ff7043', roof2: '#fff59d' }
   ], []);
 
-  // East & West Canal Banks & Bridges (X = -56 and X = +56) closing the 360° horizon
+  // East & West Canal Banks & Bridges (X = -86 and X = +86) closing the extra-wide 360° horizon
   const sideTowers = useMemo(() => [
-    { x: -54, z: -16, w: 6, h: 19, d: 6, color: '#25306e', neon: '#00e5ff' },
-    { x: -54, z: -6, w: 5.5, h: 14, d: 5.5, color: '#212b63', neon: '#ffd740' },
-    { x: -54, z: 8, w: 6, h: 21, d: 6, color: '#283475', neon: '#ff4081' },
-    { x: -54, z: 18, w: 5, h: 15, d: 5, color: '#222c66', neon: null },
-    { x: 54, z: -16, w: 6, h: 22, d: 6, color: '#273373', neon: '#e040fb' },
-    { x: 54, z: -5, w: 5.5, h: 16, d: 5.5, color: '#232e69', neon: '#69f0ae' },
-    { x: 54, z: 9, w: 6, h: 20, d: 6, color: '#293678', neon: '#40c4ff' },
-    { x: 54, z: 19, w: 5.5, h: 14, d: 5.5, color: '#212b63', neon: '#ffd740' }
+    { x: -86, z: -48, w: 6, h: 19, d: 6, color: '#25306e', neon: '#00f5d4' },
+    { x: -86, z: -26, w: 5.5, h: 14, d: 5.5, color: '#212b63', neon: '#ffd166' },
+    { x: -86, z: -4, w: 6, h: 21, d: 6, color: '#283475', neon: '#ff2a85' },
+    { x: -86, z: 16, w: 5, h: 15, d: 5, color: '#222c66', neon: '#00f5d4' },
+    { x: 86, z: -48, w: 6, h: 22, d: 6, color: '#273373', neon: '#e040fb' },
+    { x: 86, z: -25, w: 5.5, h: 16, d: 5.5, color: '#232e69', neon: '#00f5d4' },
+    { x: 86, z: -3, w: 6, h: 20, d: 6, color: '#293678', neon: '#ff2a85' },
+    { x: 86, z: 17, w: 5.5, h: 14, d: 5.5, color: '#212b63', neon: '#ffd166' }
   ], []);
 
   return html`
     <group>
-      <!-- South Promenade Riverbank Embankment (Behind Camera at Z = +24.5) -->
-      <mesh position=${[0, 0.6, 24.5]} receiveShadow>
-        <boxGeometry args=${[120, 1.6, 9]} />
+      <!-- South Promenade Riverbank Embankment (Extra-Wide 200 units) -->
+      <mesh position=${[0, 0.6, 24.5]}>
+        <boxGeometry args=${[200, 1.6, 9]} />
         <meshStandardMaterial color="#1a224d" roughness=${0.85} />
       </mesh>
 
@@ -1600,13 +1627,13 @@ function Voxel360SurroundingCity() {
         </group>
       `)}
 
-      <!-- East & West Side Embankments & City Towers (Completing full 360° wide bay) -->
-      <mesh position=${[-55, 0.6, -10]}>
-        <boxGeometry args=${[10, 1.6, 86]} />
+      <!-- East & West Side Embankments & City Towers (Pushed far out to X = ±88 for massive wide bay) -->
+      <mesh position=${[-88, 0.6, -21]}>
+        <boxGeometry args=${[12, 1.6, 128]} />
         <meshStandardMaterial color="#18204a" />
       </mesh>
-      <mesh position=${[55, 0.6, -10]}>
-        <boxGeometry args=${[10, 1.6, 86]} />
+      <mesh position=${[88, 0.6, -21]}>
+        <boxGeometry args=${[12, 1.6, 128]} />
         <meshStandardMaterial color="#18204a" />
       </mesh>
 
@@ -1687,40 +1714,40 @@ function VoxelPalmTree({ position = [0, 0, 0], scale = 1, neonColor = '#ff2a85',
 }
 
 function VoxelViceSunsetHorizon() {
-  // 360-degree distant GTA 6 Vice Beach Sunset-to-Twilight Horizon Cylinder Bands
+  // 360-degree distant GTA 6 Vice Beach Sunset-to-Twilight Horizon Cylinder Bands (Extra-Wide Radius 130)
   return html`
     <group position=${[0, 0, 0]}>
       <!-- Lowest Warm Peach-Orange Horizon Band -->
-      <mesh position=${[0, 3.2, 0]}>
-        <cylinderGeometry args=${[86, 86, 6.5, 32, 1, true]} />
+      <mesh position=${[0, 4.0, 0]}>
+        <cylinderGeometry args=${[128, 128, 8.0, 32, 1, true]} />
         <meshBasicMaterial color="#ff8c61" side=${THREE.BackSide} fog=${false} transparent=${true} opacity=${0.62} />
       </mesh>
       <!-- Hot Vice Pink-Magenta Band -->
-      <mesh position=${[0, 9.2, 0]}>
-        <cylinderGeometry args=${[86.5, 86.5, 7.0, 32, 1, true]} />
+      <mesh position=${[0, 11.5, 0]}>
+        <cylinderGeometry args=${[128.5, 128.5, 8.5, 32, 1, true]} />
         <meshBasicMaterial color="#ff2a85" side=${THREE.BackSide} fog=${false} transparent=${true} opacity=${0.48} />
       </mesh>
       <!-- Electric Leonida Violet-Purple Band -->
-      <mesh position=${[0, 16.5, 0]}>
-        <cylinderGeometry args=${[87, 87, 9.0, 32, 1, true]} />
+      <mesh position=${[0, 20.5, 0]}>
+        <cylinderGeometry args=${[129, 129, 11.0, 32, 1, true]} />
         <meshBasicMaterial color="#7209b7" side=${THREE.BackSide} fog=${false} transparent=${true} opacity=${0.36} />
       </mesh>
 
-      <!-- Palm Trees Lining Both the North Ocean Drive & South Beach Festival Walk (Expanded Wide Bay) -->
-      ${[-38, -26, -15, 2, 14, 26, 38].map((px, i) => html`
+      <!-- Palm Trees Lining Both the Extra-Wide North Ocean Drive & South Beach Festival Walk -->
+      ${[-60, -44, -28, -14, 2, 16, 32, 48, 62].map((px, i) => html`
         <${VoxelPalmTree}
           key=${'npalm-' + i}
-          position=${[px, 1.35, -32.8]}
-          scale=${0.92}
+          position=${[px, 1.35, -45.8]}
+          scale=${0.95}
           neonColor=${i % 2 === 0 ? '#ff2a85' : '#00f5d4'}
           lean=${i % 2 === 0 ? 0.12 : -0.1}
         />
       `)}
-      ${[-32, -20, -9, 9, 20, 32].map((px, i) => html`
+      ${[-56, -38, -22, -9, 9, 22, 38, 56].map((px, i) => html`
         <${VoxelPalmTree}
           key=${'spalm-' + i}
-          position=${[px, 1.35, 29.8]}
-          scale=${0.95}
+          position=${[px, 1.35, 39.8]}
+          scale=${0.98}
           neonColor=${i % 2 === 0 ? '#00f5d4' : '#ff2a85'}
           lean=${i % 2 === 0 ? -0.11 : 0.11}
         />
@@ -1784,9 +1811,9 @@ function VoxelCitySkyline() {
 
   return html`
     <group>
-      <!-- Continuous Concrete City Riverbank & Promenade Wall -->
-      <mesh position=${[0, 0.6, -24.5]} receiveShadow>
-        <boxGeometry args=${[120, 1.6, 7]} />
+      <!-- Continuous Concrete City Riverbank & Promenade Wall (Extra-Wide 200 units) -->
+      <mesh position=${[0, 0.6, -24.5]}>
+        <boxGeometry args=${[200, 1.6, 7]} />
         <meshStandardMaterial color="#111633" roughness=${0.85} />
       </mesh>
 
@@ -2005,57 +2032,57 @@ function VoxelEnvironment({ onWaterClick }) {
       <${VoxelViceSunsetHorizon} />
 
       <!-- Giant Glowing 3D Voxel Full Moon (พระจันทร์เต็มดวงคืนวันเพ็ญบนท้องฟ้า) -->
-      <group position=${[-1, 16.2, -35]}>
+      <group position=${[-1, 22.0, -58]}>
         <!-- Round Voxel/Low-Poly Full Moon Core (fog=false so it always shines crisply) -->
         <mesh>
-          <sphereGeometry args=${[4.6, 14, 10]} />
+          <sphereGeometry args=${[5.8, 14, 10]} />
           <meshBasicMaterial color="#fff9d2" fog=${false} />
         </mesh>
         <!-- Subtle Pixel Moon Craters (ลายกระต่ายบนดวงจันทร์) -->
-        <mesh position=${[-1.4, 1.0, 4.35]}>
-          <boxGeometry args=${[1.5, 1.3, 0.35]} />
+        <mesh position=${[-1.7, 1.2, 5.5]}>
+          <boxGeometry args=${[1.8, 1.5, 0.4]} />
           <meshBasicMaterial color="#ebd27f" fog=${false} />
         </mesh>
-        <mesh position=${[1.3, -0.7, 4.38]}>
-          <boxGeometry args=${[1.3, 1.1, 0.35]} />
+        <mesh position=${[1.6, -0.8, 5.5]}>
+          <boxGeometry args=${[1.5, 1.3, 0.4]} />
           <meshBasicMaterial color="#ebd27f" fog=${false} />
         </mesh>
-        <mesh position=${[-0.8, -1.7, 4.25]}>
-          <boxGeometry args=${[0.9, 0.9, 0.35]} />
+        <mesh position=${[-1.0, -2.1, 5.3]}>
+          <boxGeometry args=${[1.1, 1.1, 0.4]} />
           <meshBasicMaterial color="#e5c86e" fog=${false} />
         </mesh>
-        <mesh position=${[0.8, 1.6, 4.2]}>
-          <boxGeometry args=${[0.8, 0.8, 0.35]} />
+        <mesh position=${[1.0, 2.0, 5.3]}>
+          <boxGeometry args=${[1.0, 1.0, 0.4]} />
           <meshBasicMaterial color="#e5c86e" fog=${false} />
         </mesh>
         <!-- Inner Warm Golden Moon Halo -->
-        <mesh position=${[0, 0, -0.4]}>
-          <circleGeometry args=${[6.4, 24]} />
+        <mesh position=${[0, 0, -0.5]}>
+          <circleGeometry args=${[8.2, 24]} />
           <meshBasicMaterial color="#ffe58f" transparent=${true} opacity=${0.36} fog=${false} />
         </mesh>
         <!-- Outer Soft Vice Sunset Moon Aura -->
-        <mesh position=${[0, 0, -0.8]}>
-          <circleGeometry args=${[9.2, 24]} />
+        <mesh position=${[0, 0, -1.0]}>
+          <circleGeometry args=${[11.8, 24]} />
           <meshBasicMaterial color="#ff9ebb" transparent=${true} opacity=${0.2} fog=${false} />
         </mesh>
-        <pointLight color="#fff0b3" intensity=${10} distance=${140} />
+        <pointLight color="#fff0b3" intensity=${10} distance=${180} />
       </group>
 
-      <!-- 3D Voxel Vice Beach Skyline (Expanded Wide Bay: North Bank Z=-35, South Bank Z=+32) -->
-      <group position=${[0, 0, -11]}>
+      <!-- 3D Voxel Vice Beach Skyline (Extra-Wide Massive Bay: North Bank Z=-48, South Bank Z=+42) -->
+      <group position=${[0, 0, -24]}>
         <${VoxelCitySkyline} />
       </group>
-      <group position=${[0, 0, 8]}>
+      <group position=${[0, 0, 18]}>
         <${Voxel360SurroundingCity} />
       </group>
-      <group position=${[0, 0, 8]}>
+      <group position=${[0, 0, 18]}>
         <${VoxelFestivalCrowd} />
       </group>
       <${VoxelCuteAnimals} />
       <${VoxelThrowTrajectory} />
 
-      <!-- Shore-Connected Thai Wooden Pier Bridge (เชื่อมต่อจากริมฝั่งถนนงานวัด Z=29 ยื่นลงสู่แม่น้ำกว้าง Z=20.5) -->
-      <group position=${[-14, 0, 24.5]}>
+      <!-- Shore-Connected Thai Wooden Pier Bridge (เชื่อมต่อจากริมฝั่งถนนงานวัด Z=39 ยื่นลงสู่แม่น้ำกว้าง Z=30.5) -->
+      <group position=${[-14, 0, 34.5]}>
         <!-- Main Wooden Walkway Deck connecting South Bank directly into the River -->
         <mesh position=${[0, 1.15, 0]} receiveShadow castShadow>
           <boxGeometry args=${[6.8, 0.45, 9.5]} />
@@ -2112,23 +2139,23 @@ function VoxelEnvironment({ onWaterClick }) {
         <pointLight position=${[0, 4.6, -4.2]} color="#ffcc80" intensity=${7} distance=${24} />
       </group>
 
-      <!-- 3D River Surface Plane (Expanded Wide Vice Beach Bay + Aim & Charge-Throw) -->
+      <!-- 3D River Surface Plane (Extra-Wide Massive Vice Beach Bay 220x125 + Aim & Charge-Throw) -->
       <mesh
         ref=${waterRef}
-        position=${[0, -0.05, -2]}
+        position=${[0, -0.05, -3]}
         rotation=${[-Math.PI / 2, 0, 0]}
         onPointerMove=${(e) => {
           if (window.loyState && window.loyState.throwMode && window.loyState.throwMode.active) {
             e.stopPropagation();
-            window.loyState.throwMode.aimX3D = Math.max(-38, Math.min(38, e.point.x));
-            window.loyState.throwMode.aimZ3D = Math.max(-24, Math.min(18, e.point.z));
+            window.loyState.throwMode.aimX3D = Math.max(-64, Math.min(64, e.point.x));
+            window.loyState.throwMode.aimZ3D = Math.max(-38, Math.min(26, e.point.z));
           }
         }}
         onPointerDown=${(e) => {
           if ((e.button === 0 || e.pointerType === 'touch') && window.loyState && window.loyState.throwMode && window.loyState.throwMode.active) {
             e.stopPropagation();
-            window.loyState.throwMode.aimX3D = Math.max(-38, Math.min(38, e.point.x));
-            window.loyState.throwMode.aimZ3D = Math.max(-24, Math.min(18, e.point.z));
+            window.loyState.throwMode.aimX3D = Math.max(-64, Math.min(64, e.point.x));
+            window.loyState.throwMode.aimZ3D = Math.max(-38, Math.min(26, e.point.z));
             window.loyState.throwMode.charging = true;
             window.loyState.throwMode.power = 0.15;
             window.loyState.throwMode.powerDir = 1;
@@ -2153,7 +2180,7 @@ function VoxelEnvironment({ onWaterClick }) {
           if (onWaterClick) onWaterClick(e.point);
         }}
       >
-        <planeGeometry args=${[170, 88, 12, 12]} />
+        <planeGeometry args=${[220, 125, 12, 12]} />
         <meshStandardMaterial
           color="#135685"
           emissive="#2d1259"
@@ -2391,7 +2418,7 @@ function CameraRig() {
       maxPolarAngle=${Math.PI - 0.15}
       minPolarAngle=${0.05}
       minDistance=${2.5}
-      maxDistance=${95}
+      maxDistance=${135}
       onStart=${() => {
         // Stop initial auto-zoom so user can freely orbit 360° around the locked krathong
         zoomingToLockRef.current = false;
@@ -2444,15 +2471,15 @@ function LoyKrathongR3FApp() {
     <${Canvas}
       dpr=${[1, 1.5]}
       camera=${{
-        position: isPortrait ? [0, 15.5, 36] : [0, 11.5, 28],
-        fov: isPortrait ? 58 : 48
+        position: isPortrait ? [0, 18.5, 46] : [0, 14.5, 38],
+        fov: isPortrait ? 60 : 50
       }}
       gl=${{ antialias: false, toneMappingExposure: 1.45, powerPreference: 'high-performance' }}
     >
       <color attach="background" args=${['#280e4a']} />
-      <fog attach="fog" args=${['#3d1466', 54, 128]} />
+      <fog attach="fog" args=${['#3d1466', 72, 185]} />
 
-      <${Stars} radius=${75} depth=${35} count=${900} factor=${4.5} saturation=${0.85} fade speed=${1.0} />
+      <${Stars} radius=${105} depth=${40} count=${900} factor=${4.5} saturation=${0.85} fade speed=${1.0} />
 
       <${CameraRig} />
       <${VoxelEnvironment} />
