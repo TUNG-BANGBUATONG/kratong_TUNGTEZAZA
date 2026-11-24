@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#2b1055" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>ลอยกระทงออนไลน์ 3D VOXEL &amp; 8-BIT ✨ | React Three Fiber Loy Krathong</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,600;0,700;1,400&family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Import Map for React 18, Three.js, React Three Fiber (@react-three/fiber), @react-three/drei, and HTM -->
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.3.1",
+        "react/": "https://esm.sh/react@18.3.1/",
+        "react-dom": "https://esm.sh/react-dom@18.3.1",
+        "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+        "three": "https://esm.sh/three@0.168.0",
+        "three/": "https://esm.sh/three@0.168.0/",
+        "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.17.10?external=react,react-dom,three",
+        "@react-three/drei": "https://esm.sh/@react-three/drei@9.114.0?external=react,react-dom,three,@react-three/fiber",
+        "htm": "https://esm.sh/htm@3.1.1"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- React Three Fiber 3D Voxel Canvas Root -->
+  <div id="r3fRoot" class="r3f-root"></div>
+
+  <!-- Fallback / Overlay 2D Canvas (hidden when R3F is active) -->
+  <canvas id="sceneCanvas" class="hidden"></canvas>
+
+  <!-- Retro CRT / Pixel Scanline Overlay -->
+  <div id="crtOverlay" class="crt-overlay"></div>
+
+  <!-- Top HUD Bar -->
+  <header class="top-hud">
+    <div class="brand-box pixel-panel">
+      <div class="brand-icon" id="brandKrathongIcon"></div>
+      <div class="brand-text">
+        <h1>ลอยกระทง <span class="badge-8bit">3D VOXEL</span></h1>
+        <p class="subtitle">ลากเมาส์หมุนมุมกล้อง 360° • คลิกที่กระทงเพื่ออ่านคำอธิษฐาน</p>
+      </div>
+    </div>
+
+    <div class="status-controls">
+      <div class="stats-pill pixel-panel">
+        <span class="stat-label">กระทงในแม่น้ำ:</span>
+        <span class="stat-value" id="totalKrathongCount">0</span>
+      </div>
+
+      <button class="pixel-btn icon-btn" id="btnWishesFeed" title="ดูรายการคำอธิษฐานทั้งหมด">
+        <span>📜</span>
+        <span class="btn-label">คำอธิษฐาน</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Floating Hint / Toast Notifications -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- 3D Krathong Throw / Aiming Mode HUD Overlay -->
+  <div id="throwHud" class="throw-hud pixel-panel hidden">
+    <div class="throw-hud-header">
+      <span class="throw-badge">🎯 โหมดเล็งโยนกระทง 3D</span>
+      <span id="throwSenderPreview" class="throw-sender-preview"></span>
+    </div>
+    <p class="throw-instruction">
+      แตะหรือเลื่อนเล็งจุดในแม่น้ำ • <strong>กดค้างเพื่อชาร์จแรงโยน</strong> แล้วปล่อยเพื่อโยนกระทง!
+    </p>
+    <div class="power-bar-wrapper">
+      <div class="power-bar-fill" id="throwPowerFill" style="width: 0%"></div>
+      <span class="power-bar-text" id="throwPowerText">แรงโยน: พร้อมเล็ง (คลิกค้างบนแม่น้ำ)</span>
+    </div>
+    <div class="throw-hud-actions">
+      <button type="button" class="pixel-btn primary-cta" id="btnQuickThrow">
+        🚀 โยนลงจุดที่เล็งทันที
+      </button>
+      <button type="button" class="pixel-btn ghost-btn" id="btnCancelThrow">
+        ✕ ยกเลิก
+      </button>
+    </div>
+  </div>
+
+  <!-- Bottom Dock Action Bar -->
+  <div class="bottom-dock">
+    <button class="pixel-btn primary-cta pulse-glow" id="btnOpenBuilder">
+      <span class="cta-sparkle">✨</span>
+      <span>ประดิษฐ์ &amp; ลอยกระทงของคุณ</span>
+      <span class="cta-sparkle">🌕</span>
+    </button>
+  </div>
+
+  <!-- Right Side Drawer: Live Wishes Feed -->
+  <aside id="wishesDrawer" class="wishes-drawer pixel-panel hidden">
+    <div class="drawer-header">
+      <h2>📜 คำอธิษฐานริมสายน้ำ</h2>
+      <button class="pixel-close-btn" id="btnCloseDrawer" aria-label="ปิดหน้าต่าง">✕</button>
+    </div>
+    <div class="drawer-search">
+      <input type="text" id="searchWishInput" class="pixel-input" placeholder="ค้นหาชื่อ หรือคำอธิษฐาน..." />
+    </div>
+    <div id="wishesList" class="wishes-list"></div>
+  </aside>
+
+  <!-- Modal 1: Pixel Krathong Builder & Customizer -->
+  <div id="builderModal" class="modal-backdrop hidden">
+    <div class="modal-window pixel-panel builder-window">
+      <div class="modal-header">
+        <h2>🪷 ประดิษฐ์กระทง PIXEL &amp; VOXEL 3D</h2>
+        <button class="pixel-close-btn" id="btnCloseBuilder" aria-label="ปิด">✕</button>
+      </div>
+
+      <div class="builder-body">
+        <!-- Left Column: Live Pixel Preview Canvas -->
+        <div class="preview-column">
+          <div class="preview-stage pixel-panel-inset">
+            <canvas id="previewCanvas" width="220" height="220"></canvas>
+            <div class="preview-water-label" id="previewStyleSummary">ฐานใบตอง • ดอกบัวหลวง • เทียนมงคล</div>
+          </div>
+          <button type="button" class="pixel-btn secondary-btn random-btn" id="btnRandomizeKrathong">
+            🎲 สุ่มแต่งกระทงนำโชค
+          </button>
+        </div>
+
+        <!-- Right Column: Customization Steps & Wish Form -->
+        <div class="customizer-column">
+          <div class="selector-group">
+            <label class="group-title">1. เลือกฐานกระทง (Base)</label>
+            <div class="option-grid" id="baseOptions"></div>
+          </div>
+
+          <div class="selector-group">
+            <label class="group-title">2. เลือกกลีบ &amp; ดอกไม้ (Flowers)</label>
+            <div class="option-grid" id="flowerOptions"></div>
+          </div>
+
+          <div class="selector-group">
+            <label class="group-title">3. เลือกธูปเทียน (Candle &amp; Incense)</label>
+            <div class="option-grid" id="candleOptions"></div>
+          </div>
+
+          <div class="selector-group">
+            <label class="group-title">4. ของตกแต่งมงคล (Topping)</label>
+            <div class="option-grid" id="toppingOptions"></div>
+          </div>
+
+          <div class="selector-group">
+            <label class="group-title">5. ร่องน้ำที่ต้องการวางกระทง (3D Depth Lane)</label>
+            <div class="lane-selector" id="laneOptions">
+              <button type="button" class="lane-btn" data-lane="0">ไกลฝั่ง (บน)</button>
+              <button type="button" class="lane-btn active" data-lane="1">ร่องน้ำกลาง 1</button>
+              <button type="button" class="lane-btn" data-lane="2">ร่องน้ำกลาง 2</button>
+              <button type="button" class="lane-btn" data-lane="3">ใกล้ท่าน้ำ (หน้า)</button>
+            </div>
+          </div>
+
+          <!-- Form Inputs -->
+          <form id="krathongForm" class="wish-form">
+            <div class="form-row">
+              <label for="senderName">ชื่อผู้ลอยกระทง <span class="req">*</span></label>
+              <input
+                type="text"
+                id="senderName"
+                class="pixel-input"
+                maxlength="40"
+                placeholder="เช่น น้องเหมียว 8-Bit, สมชาย..."
+                required
+              />
+            </div>
+
+            <div class="form-row">
+              <div class="label-with-presets">
+                <label for="wishMessage">คำอธิษฐานขอพรพระแม่คงคา <span class="req">*</span></label>
+                <button type="button" class="preset-wish-btn" id="btnSampleWish">💡 สุ่มคำอวยพร</button>
+              </div>
+              <textarea
+                id="wishMessage"
+                class="pixel-input"
+                rows="3"
+                maxlength="200"
+                placeholder="เขียนคำอธิษฐานของคุณที่นี่..."
+                required
+              ></textarea>
+              <div class="char-counter"><span id="charCount">0</span>/200</div>
+            </div>
+
+            <div class="modal-actions">
+              <button type="button" class="pixel-btn ghost-btn" id="btnCancelBuilder">ยกเลิก</button>
+              <button type="button" class="pixel-btn secondary-btn" id="btnAimThrowKrathong">
+                🎯 เล็งโยนกระทงเองในฉาก 3D
+              </button>
+              <button type="submit" class="pixel-btn primary-cta" id="btnSubmitKrathong">
+                🌊 วางลอยจากท่าน้ำทันที
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Camera-Lock Krathong Detail Card (Non-blocking so 3D locked Krathong is fully visible!) -->
+  <aside id="inspectModal" class="inspect-dock hidden">
+    <div class="pixel-panel inspect-card">
+      <div class="modal-header inspect-card-header">
+        <div class="lock-title-wrap">
+          <span class="lock-pill">🎥 ล็อคกล้องติดตาม</span>
+          <h2>✨ รายละเอียดกระทง</h2>
+        </div>
+        <button class="pixel-close-btn" id="btnCloseInspect" aria-label="ปลดล็อคกล้องและปิด">✕</button>
+      </div>
+      <div class="inspect-body">
+        <div class="inspect-top-row">
+          <div class="inspect-preview pixel-panel-inset">
+            <canvas id="inspectCanvas" width="110" height="110"></canvas>
+          </div>
+          <div class="inspect-meta">
+            <div class="inspect-sender" id="inspectSenderName">ผู้ลอยกระทง</div>
+            <div class="inspect-time" id="inspectTimestamp">เมื่อสักครู่</div>
+            <div class="inspect-tags" id="inspectTags"></div>
+          </div>
+        </div>
+        <div class="inspect-details">
+          <blockquote class="inspect-wish" id="inspectWishText">
+            "คำอธิษฐาน..."
+          </blockquote>
+          <div class="inspect-actions">
+            <button type="button" class="pixel-btn bless-btn" id="btnBlessKrathong">
+              <span>🙏 อนุโมทนา</span>
+              <span class="bless-count" id="inspectLikesCount">0</span>
+            </button>
+            <button type="button" class="pixel-btn ghost-btn" id="btnFollowKrathong">
+              🔓 ปลดล็อคกล้อง
+            </button>
+          </div>
+          <div class="inspect-nav-row">
+            <button type="button" class="pixel-btn secondary-btn nav-k-btn" id="btnPrevKrathong">
+              ◀ กระทงก่อนหน้า
+            </button>
+            <button type="button" class="pixel-btn secondary-btn nav-k-btn" id="btnNextKrathong">
+              กระทงถัดไป ▶
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <script src="pixel-art.js"></script>
+  <script src="audio-8bit.js"></script>
+  <script src="app.js"></script>
+  <script type="module" src="r3f-scene.js"></script>
+</body>
+</html>
