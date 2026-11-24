@@ -21,6 +21,7 @@ try {
 const state = {
   krathongs: [],          // Active floating Krathong entities in the river
   krathongMap: new Map(), // id -> krathong entity
+  krathongsVersion: 0,    // Incremented only when list/likes change (prevents R3F re-render lag!)
   stars: [],              // Twinkling pixel stars
   lanterns: [],           // Sky lanterns (โคมลอย)
   fireworks: [],          // Rocket projectiles + pixel explosion particles
@@ -200,6 +201,16 @@ function getLaneMetrics(laneIndex) {
   };
 }
 
+function hashStringToUnit(str) {
+  let h = 2166136261;
+  const s = String(str || '');
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 10000) / 10000;
+}
+
 function upsertKrathongEntity(record, options = { isNewlyLaunched: false }) {
   if (!record || !record.id) return null;
 
@@ -208,11 +219,26 @@ function upsertKrathongEntity(record, options = { isNewlyLaunched: false }) {
     existing.likes_count = record.likes_count ?? existing.likes_count;
     existing.sender_name = record.sender_name || existing.sender_name;
     existing.wish_message = record.wish_message || existing.wish_message;
+    state.krathongsVersion++;
     return existing;
   }
 
   const lane = Number(record.lane ?? 1) % 4;
   const metrics = getLaneMetrics(lane);
+
+  // Wide, organic scattering across the expanded Vice Beach bay (X: -44..+44, Z: -24..+18)
+  const laneCentersZ = [-20, -9, 2, 13];
+  const h1 = hashStringToUnit(record.id + '-z');
+  const h2 = hashStringToUnit(record.id + '-x');
+  const scatteredZ = options.z3D !== undefined
+    ? options.z3D
+    : laneCentersZ[lane] + (h1 - 0.5) * 9.5; // Wide +/- 4.75 organic spread per band!
+
+  const initialX3D = options.x3D !== undefined
+    ? options.x3D
+    : (options.isNewlyLaunched
+        ? (-14 + (Math.random() - 0.5) * 6)
+        : (-42 + h2 * 84));
 
   const startX = options.startX !== undefined
     ? options.startX
@@ -233,13 +259,16 @@ function upsertKrathongEntity(record, options = { isNewlyLaunched: false }) {
     created_at: record.created_at || new Date().toISOString(),
     x: startX,
     y: metrics.baseY,
+    x3D: initialX3D,
+    z3D: Math.max(-25, Math.min(18.5, scatteredZ)),
     bobPhase: Math.random() * Math.PI * 2,
-    speedMultiplier: 0.85 + Math.random() * 0.3,
+    speedMultiplier: 0.75 + Math.random() * 0.45,
     throwAnim: options.throwAnim || null
   };
 
   state.krathongMap.set(entity.id, entity);
   state.krathongs.push(entity);
+  state.krathongsVersion++;
 
   // Sort by lane so closer Krathongs draw in front of distant ones
   state.krathongs.sort((a, b) => a.lane - b.lane);
@@ -733,14 +762,31 @@ function animate() {
     if (textEl) textEl.textContent = `กำลังชาร์จแรงโยน: ${pct}% (ปล่อยเมาส์เพื่อโยน!)`;
   }
 
-  ctx.clearRect(0, 0, W, H);
-  renderNightSky();
-  renderSkyLanterns();
-  renderTempleSilhouette();
-  renderFireworks();
-  renderRiverAndReflections();
-  renderWoodenPier();
-  renderFloatingKrathongs();
+  const isR3FActive = Boolean(document.getElementById('r3fRoot'));
+
+  if (isR3FActive) {
+    // Lightweight pure-math 3D river drift (skip hidden 2D canvas rendering for max FPS!)
+    const laneSpeeds3D = [0.011, 0.015, 0.019, 0.024];
+    for (let i = 0; i < state.krathongs.length; i++) {
+      const k = state.krathongs[i];
+      if (!k.throwAnim) {
+        const sp = (laneSpeeds3D[k.lane % 4] || 0.016) * (k.speedMultiplier || 1);
+        k.x3D = (k.x3D ?? 0) + sp;
+        if (k.x3D > 48) {
+          k.x3D = -48;
+        }
+      }
+    }
+  } else {
+    ctx.clearRect(0, 0, W, H);
+    renderNightSky();
+    renderSkyLanterns();
+    renderTempleSilhouette();
+    renderFireworks();
+    renderRiverAndReflections();
+    renderWoodenPier();
+    renderFloatingKrathongs();
+  }
 
   // Also animate the Builder & Inspect modal preview canvases if open
   if (!builderModal.classList.contains('hidden')) {
@@ -940,6 +986,8 @@ async function saveAndSpawnKrathong(payload, throwOptions = null) {
   const entity = upsertKrathongEntity(savedRecord, {
     isNewlyLaunched: true,
     startX: throwOptions ? throwOptions.landingPxX : undefined,
+    x3D: throwOptions ? throwOptions.endX : undefined,
+    z3D: throwOptions ? throwOptions.endZ : undefined,
     throwAnim: throwOptions ? throwOptions.throwAnim : null
   });
 
@@ -981,24 +1029,26 @@ document.getElementById('krathongForm').addEventListener('submit', async (e) => 
   submitBtn.disabled = true;
   submitBtn.textContent = '🌊 กำลังปล่อยกระทงลงน้ำ...';
 
-  // Even direct launch gets a gentle short arc from the connected shore pier into the chosen lane
-  const laneZList = [-10, -4, 2, 8];
-  const targetZ = laneZList[payload.lane % 4] ?? 2;
-  const targetX3D = -8;
-  const landingPxX = ((targetX3D / 48) + 0.5) * Math.max(800, window.innerWidth);
+  // Direct launch lands with organic spread in the chosen depth band of the wide river
+  const laneZList = [-20, -9, 2, 13];
+  const targetZ = (laneZList[payload.lane % 4] ?? 2) + (Math.random() - 0.5) * 6.5;
+  const targetX3D = -12 + (Math.random() - 0.5) * 14;
+  const landingPxX = ((targetX3D / 92) + 0.5) * Math.max(800, window.innerWidth);
 
   await saveAndSpawnKrathong(payload, {
     landingPxX,
+    endX: targetX3D,
+    endZ: targetZ,
     power: 0.45,
     throwAnim: {
       startTime: performance.now(),
       durationMs: 700,
       startX: -14.0,
       startY: 2.3,
-      startZ: 12.5,
+      startZ: 20.5,
       endX: targetX3D,
       endZ: targetZ,
-      peakHeight: 3.8
+      peakHeight: 4.2
     }
   });
 
@@ -1014,14 +1064,14 @@ if (btnAimThrow) {
     const payload = buildDraftPayloadFromForm();
     if (!payload) return;
 
-    if (window.retroAudio) window.retroAudio.playClickSfx(780);
+    if (window.retroAudio) window.retroAudio.playClickSfx();
 
     state.throwMode.active = true;
     state.throwMode.charging = false;
     state.throwMode.power = 0.5;
     state.throwMode.draftPayload = payload;
     state.throwMode.aimX3D = -4;
-    state.throwMode.aimZ3D = [-10, -4, 2, 8][payload.lane % 4] ?? 2;
+    state.throwMode.aimZ3D = [-20, -9, 2, 13][payload.lane % 4] ?? 2;
 
     builderModal.classList.add('hidden');
     throwHudEl.classList.remove('hidden');
@@ -1044,17 +1094,17 @@ async function execute3DThrow(powerValue = 0.65) {
   const payload = { ...state.throwMode.draftPayload };
 
   const pierX = -14.0;
-  const pierZ = 12.5;
+  const pierZ = 20.5;
 
-  // Compute landing 3D coordinates based on aim target & charge power boost
+  // Compute landing 3D coordinates anywhere across the wide river
   const dirX = state.throwMode.aimX3D - pierX;
   const dirZ = state.throwMode.aimZ3D - pierZ;
   const boost = 0.65 + powerValue * 0.55;
-  const endX = Math.max(-18, Math.min(24, pierX + dirX * boost));
-  const endZ = Math.max(-13, Math.min(10, pierZ + dirZ * boost));
+  const endX = Math.max(-38, Math.min(38, pierX + dirX * boost));
+  const endZ = Math.max(-24, Math.min(18, pierZ + dirZ * boost));
 
-  // Snap to closest river depth lane (0..3) so it floats naturally after landing
-  const laneZList = [-10, -4, 2, 8];
+  // Pick closest river band index (0..3) for database record, while keeping exact organic endZ!
+  const laneZList = [-20, -9, 2, 13];
   let bestLane = 1;
   let bestDist = 999;
   laneZList.forEach((lz, idx) => {
@@ -1066,13 +1116,15 @@ async function execute3DThrow(powerValue = 0.65) {
   });
   payload.lane = bestLane;
 
-  const landingPxX = ((endX / 48) + 0.5) * Math.max(800, window.innerWidth);
-  const peakHeight = 4.2 + powerValue * 5.5;
+  const landingPxX = ((endX / 92) + 0.5) * Math.max(800, window.innerWidth);
+  const peakHeight = 4.6 + powerValue * 6.0;
 
   exitThrowMode();
 
   await saveAndSpawnKrathong(payload, {
     landingPxX,
+    endX,
+    endZ,
     power: powerValue,
     throwAnim: {
       startTime: performance.now(),
@@ -1081,7 +1133,7 @@ async function execute3DThrow(powerValue = 0.65) {
       startY: 2.4,
       startZ: pierZ,
       endX,
-      endZ: laneZList[bestLane],
+      endZ,
       peakHeight
     }
   });
@@ -1183,6 +1235,7 @@ document.getElementById('btnBlessKrathong').addEventListener('click', async () =
   if (!k) return;
 
   k.likes_count = (k.likes_count || 0) + 1;
+  state.krathongsVersion++;
   document.getElementById('inspectLikesCount').textContent = k.likes_count;
 
   if (window.retroAudio) {

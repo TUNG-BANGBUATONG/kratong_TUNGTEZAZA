@@ -3,7 +3,7 @@
 // Uses @react-three/fiber, @react-three/drei, Three.js, and HTM
 // ============================================================================
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
@@ -36,21 +36,26 @@ const CANDLE_COLORS = {
   double: '#ffb300'
 };
 
-// Map 2D river coordinates (0..W, lane 0..3) into 3D river coordinates
-const LANE_Z = [-10, -4, 2, 8];
+// Wide Vice Beach bay lanes (expanded so krathongs scatter freely!)
+const LANE_Z = [-20, -9, 2, 13];
 
 function mapXTo3D(px) {
   const w = Math.max(800, window.innerWidth);
-  return ((px / w) - 0.5) * 48;
+  return ((px / w) - 0.5) * 92;
+}
+
+function getKrathongWorldPos(entity) {
+  const x3d = entity.x3D !== undefined ? entity.x3D : mapXTo3D(entity.x);
+  const z3d = entity.z3D !== undefined ? entity.z3D : (LANE_Z[entity.lane % 4] ?? 0);
+  return { x3d, z3d };
 }
 
 // ============================================================================
-// 1. 3D VOXEL KRATHONG COMPONENT
+// 1. 3D VOXEL KRATHONG COMPONENT (Memoized & GPU-Optimized for 100+ Krathongs!)
 // ============================================================================
-function VoxelKrathong({ entity, isFollowed, onSelect }) {
+const VoxelKrathong = React.memo(function VoxelKrathong({ entity, isFollowed, onSelect }) {
   const groupRef = useRef();
   const flameRef = useRef();
-  const lightRef = useRef();
   const [hovered, setHovered] = useState(false);
 
   const basePal = BASE_COLORS[entity.base_style] || BASE_COLORS.banana;
@@ -69,8 +74,9 @@ function VoxelKrathong({ entity, isFollowed, onSelect }) {
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
     if (groupRef.current) {
-      let x3d = mapXTo3D(entity.x);
-      let z3d = LANE_Z[entity.lane % 4] ?? 0;
+      const pos = getKrathongWorldPos(entity);
+      let x3d = pos.x3d;
+      let z3d = pos.z3d + Math.sin(t * 0.5 + (entity.bobPhase || 0)) * 0.65;
       let y3d = Math.sin(t * 2.5 + (entity.bobPhase || 0)) * 0.14;
       let rotX = 0;
 
@@ -107,10 +113,6 @@ function VoxelKrathong({ entity, isFollowed, onSelect }) {
       const flicker = 0.88 + Math.sin(t * 18 + (entity.bobPhase || 0)) * 0.16;
       flameRef.current.scale.set(flicker, 0.9 + Math.cos(t * 23) * 0.2, flicker);
     }
-
-    if (lightRef.current) {
-      lightRef.current.intensity = 2.2 + Math.sin(t * 15 + (entity.bobPhase || 0)) * 0.45;
-    }
   });
 
   const isHighlighted = hovered || isFollowed;
@@ -135,35 +137,46 @@ function VoxelKrathong({ entity, isFollowed, onSelect }) {
         document.body.style.cursor = 'default';
       }}
     >
-      <!-- Warm Candle PointLight illuminating the Voxel Krathong & Water -->
-      <pointLight
-        ref=${lightRef}
-        position=${[0, 2.1, 0]}
-        color="#ffcc66"
-        intensity=${4.2}
-        distance=${14}
-        decay=${1.6}
-      />
+      <!-- Dynamic PointLight ONLY on highlighted/locked Krathong (prevents WebGL shader lag with many krathongs!) -->
+      ${isHighlighted && html`
+        <pointLight
+          position=${[0, 2.2, 0]}
+          color="#ffcc66"
+          intensity=${4.5}
+          distance=${14}
+          decay=${1.6}
+        />
+      `}
+
+      <!-- Soft Fake Water Glow Disc under each Krathong (Zero GPU light cost!) -->
+      <mesh position=${[0, 0.03, 0]} rotation=${[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args=${[1.45, 12]} />
+        <meshBasicMaterial
+          color="#ffaa33"
+          transparent=${true}
+          opacity=${0.22}
+        />
+      </mesh>
 
       <!-- Highlight / Spotlight Ring on Water when Hovered or Followed -->
       ${isHighlighted && html`
         <mesh position=${[0, 0.05, 0]} rotation=${[-Math.PI / 2, 0, 0]}>
           <ringGeometry args=${[1.45, 1.75, 16]} />
           <meshBasicMaterial
-            color=${isFollowed ? '#4deeea' : '#ffe28a'}
+            color=${isFollowed ? '#00f5d4' : '#ffe28a'}
             transparent=${true}
-            opacity=${0.75}
+            opacity=${0.8}
             side=${THREE.DoubleSide}
           />
         </mesh>
       `}
 
       <!-- Voxel Base Bottom Tier -->
-      <mesh position=${[0, 0.18, 0]} castShadow receiveShadow>
+      <mesh position=${[0, 0.18, 0]}>
         <boxGeometry args=${[1.8, 0.36, 1.8]} />
         <meshStandardMaterial color=${basePal.dark} roughness=${0.7} />
       </mesh>
-      <mesh position=${[0, 0.42, 0]} castShadow receiveShadow>
+      <mesh position=${[0, 0.42, 0]}>
         <boxGeometry args=${[2.05, 0.24, 2.05]} />
         <meshStandardMaterial color=${basePal.main} roughness=${0.6} />
       </mesh>
@@ -266,7 +279,7 @@ function VoxelKrathong({ entity, isFollowed, onSelect }) {
       `)}
 
       <!-- Voxel Candle Column -->
-      <mesh position=${[0, 1.12, 0.08]} castShadow>
+      <mesh position=${[0, 1.12, 0.08]}>
         <boxGeometry args=${[entity.candle_style === 'double' ? 0.38 : 0.24, 0.85, 0.24]} />
         <meshStandardMaterial color=${candleColor} roughness=${0.3} />
       </mesh>
@@ -303,7 +316,7 @@ function VoxelKrathong({ entity, isFollowed, onSelect }) {
       `}
     </group>
   `;
-}
+});
 
 // ============================================================================
 // 2. 3D VOXEL SKY LANTERNS (โคมลอย 3D)
@@ -386,16 +399,16 @@ function VoxelThrowTrajectory() {
   const tm = window.loyState && window.loyState.throwMode;
   if (!tm || !tm.active) return null;
 
-  // Connected South Pier tip coordinates
+  // Connected South Pier tip coordinates on the expanded wide bay
   const startX = -14.0;
   const startY = 2.4;
-  const startZ = 12.5;
+  const startZ = 20.5;
 
   const power = tm.charging ? tm.power : 0.65;
   const boost = 0.65 + power * 0.55;
-  const endX = Math.max(-18, Math.min(24, startX + (tm.aimX3D - startX) * boost));
-  const endZ = Math.max(-13, Math.min(10, startZ + (tm.aimZ3D - startZ) * boost));
-  const peakH = 4.2 + power * 5.5;
+  const endX = Math.max(-38, Math.min(38, startX + (tm.aimX3D - startX) * boost));
+  const endZ = Math.max(-24, Math.min(18, startZ + (tm.aimZ3D - startZ) * boost));
+  const peakH = 4.6 + power * 6.0;
 
   const dots = [];
   const steps = 14;
@@ -1376,33 +1389,36 @@ function VoxelCuteAnimals() {
         />
       `)}
 
-      <!-- 1. Cute Dogs & Cats hanging out on the Wooden Pier Bridge (สะพานท่าน้ำ) -->
-      <${VoxelDog} position=${[-12.2, 1.4, 13.6]} rotationY=${Math.PI + 0.4} furColor="#e6a85c" earColor="#8d5524" phase=${0.3} />
-      <${VoxelCat} position=${[-16.1, 1.4, 13.2]} rotationY=${Math.PI - 0.5} furColor="#ffffff" accentColor="#ff9800" phase=${1.1} />
-      <${VoxelDog} position=${[-16.0, 1.4, 16.8]} rotationY=${Math.PI - 0.2} furColor="#f5deb3" earColor="#c49a6c" phase=${1.9} />
-      <${VoxelCat} position=${[-11.8, 1.4, 18.2]} rotationY=${Math.PI + 0.2} furColor="#37474f" accentColor="#cfd8dc" phase=${2.5} />
+      <!-- 1 & 2. Cute Dogs & Cats on the Expanded South Pier & Promenade (Z + 8) -->
+      <group position=${[0, 0, 8]}>
+        <${VoxelDog} position=${[-12.2, 1.4, 13.6]} rotationY=${Math.PI + 0.4} furColor="#e6a85c" earColor="#8d5524" phase=${0.3} />
+        <${VoxelCat} position=${[-16.1, 1.4, 13.2]} rotationY=${Math.PI - 0.5} furColor="#ffffff" accentColor="#ff9800" phase=${1.1} />
+        <${VoxelDog} position=${[-16.0, 1.4, 16.8]} rotationY=${Math.PI - 0.2} furColor="#f5deb3" earColor="#c49a6c" phase=${1.9} />
+        <${VoxelCat} position=${[-11.8, 1.4, 18.2]} rotationY=${Math.PI + 0.2} furColor="#37474f" accentColor="#cfd8dc" phase=${2.5} />
 
-      <!-- 2. Extra Dogs, Cats & Hopping Bunnies around the South Vice Beach Promenade -->
-      <${VoxelDog} position=${[-21.2, 1.4, 20.9]} rotationY=${Math.PI - 0.1} furColor="#e69b45" earColor="#ffffff" phase=${0.6} />
-      <${VoxelCat} position=${[-19.5, 1.4, 21.1]} rotationY=${Math.PI + 0.3} furColor="#212121" accentColor="#ff2a85" phase=${3.2} />
-      <${VoxelDog} position=${[-10.4, 1.4, 20.9]} rotationY=${Math.PI + 0.2} furColor="#ffffff" earColor="#ff80ab" phase=${2.4} />
-      <${VoxelDog} position=${[-5.2, 1.4, 21.0]} rotationY=${Math.PI - 0.2} furColor="#f5e6ca" earColor="#c49a6c" phase=${1.8} />
-      <${VoxelCat} position=${[-3.2, 1.4, 20.8]} rotationY=${Math.PI} furColor="#ff9800" accentColor="#ffffff" phase=${1.2} />
-      <${VoxelBunny} position=${[0.1, 1.4, 20.7]} rotationY=${Math.PI} furColor="#ffffff" phase=${0.2} />
-      <${VoxelCat} position=${[3.4, 1.4, 20.9]} rotationY=${Math.PI} furColor="#ffe0b2" accentColor="#e65100" phase=${0.4} />
-      <${VoxelDog} position=${[5.8, 1.4, 21.0]} rotationY=${Math.PI - 0.25} furColor="#455a64" earColor="#cfd8dc" phase=${3.5} />
-      <${VoxelDog} position=${[10.2, 1.4, 21.1]} rotationY=${Math.PI + 0.3} furColor="#6d4c41" earColor="#3e2723" phase=${0.9} />
-      <${VoxelCat} position=${[12.6, 1.4, 20.8]} rotationY=${Math.PI - 0.15} furColor="#ffffff" accentColor="#00f5d4" phase=${2.2} />
-      <${VoxelBunny} position=${[18.2, 1.4, 21.0]} rotationY=${Math.PI - 0.4} furColor="#fce4ec" phase=${1.7} />
-      <${VoxelDog} position=${[21.0, 1.4, 20.9]} rotationY=${Math.PI + 0.1} furColor="#d49a5a" earColor="#8d5524" phase=${2.8} />
+        <${VoxelDog} position=${[-21.2, 1.4, 20.9]} rotationY=${Math.PI - 0.1} furColor="#e69b45" earColor="#ffffff" phase=${0.6} />
+        <${VoxelCat} position=${[-19.5, 1.4, 21.1]} rotationY=${Math.PI + 0.3} furColor="#212121" accentColor="#ff2a85" phase=${3.2} />
+        <${VoxelDog} position=${[-10.4, 1.4, 20.9]} rotationY=${Math.PI + 0.2} furColor="#ffffff" earColor="#ff80ab" phase=${2.4} />
+        <${VoxelDog} position=${[-5.2, 1.4, 21.0]} rotationY=${Math.PI - 0.2} furColor="#f5e6ca" earColor="#c49a6c" phase=${1.8} />
+        <${VoxelCat} position=${[-3.2, 1.4, 20.8]} rotationY=${Math.PI} furColor="#ff9800" accentColor="#ffffff" phase=${1.2} />
+        <${VoxelBunny} position=${[0.1, 1.4, 20.7]} rotationY=${Math.PI} furColor="#ffffff" phase=${0.2} />
+        <${VoxelCat} position=${[3.4, 1.4, 20.9]} rotationY=${Math.PI} furColor="#ffe0b2" accentColor="#e65100" phase=${0.4} />
+        <${VoxelDog} position=${[5.8, 1.4, 21.0]} rotationY=${Math.PI - 0.25} furColor="#455a64" earColor="#cfd8dc" phase=${3.5} />
+        <${VoxelDog} position=${[10.2, 1.4, 21.1]} rotationY=${Math.PI + 0.3} furColor="#6d4c41" earColor="#3e2723" phase=${0.9} />
+        <${VoxelCat} position=${[12.6, 1.4, 20.8]} rotationY=${Math.PI - 0.15} furColor="#ffffff" accentColor="#00f5d4" phase=${2.2} />
+        <${VoxelBunny} position=${[18.2, 1.4, 21.0]} rotationY=${Math.PI - 0.4} furColor="#fce4ec" phase=${1.7} />
+        <${VoxelDog} position=${[21.0, 1.4, 20.9]} rotationY=${Math.PI + 0.1} furColor="#d49a5a" earColor="#8d5524" phase=${2.8} />
+      </group>
 
-      <!-- 3. Dogs & Cats watching from the North Ocean Drive Riverbank -->
-      <${VoxelDog} position=${[-18.0, 1.4, -21.0]} rotationY=${0.2} furColor="#f5deb3" earColor="#a1887f" phase=${0.8} />
-      <${VoxelDog} position=${[-13.5, 1.4, -21.0]} rotationY=${0.3} furColor="#d49a5a" earColor="#795548" phase=${2.1} />
-      <${VoxelCat} position=${[-7.5, 1.4, -21.0]} rotationY=${-0.1} furColor="#ff9800" accentColor="#fff3e0" phase=${1.9} />
-      <${VoxelBunny} position=${[-2.0, 1.4, -21.0]} rotationY=${0} furColor="#fff8e1" phase=${2.9} />
-      <${VoxelCat} position=${[8.5, 1.4, -21.0]} rotationY=${-0.2} furColor="#ffffff" accentColor="#78909c" phase=${1.4} />
-      <${VoxelDog} position=${[19.0, 1.4, -21.0]} rotationY=${-0.25} furColor="#e69b45" earColor="#8d5524" phase=${3.3} />
+      <!-- 3. Dogs & Cats watching from the Expanded North Ocean Drive Riverbank (Z - 11) -->
+      <group position=${[0, 0, -11]}>
+        <${VoxelDog} position=${[-18.0, 1.4, -21.0]} rotationY=${0.2} furColor="#f5deb3" earColor="#a1887f" phase=${0.8} />
+        <${VoxelDog} position=${[-13.5, 1.4, -21.0]} rotationY=${0.3} furColor="#d49a5a" earColor="#795548" phase=${2.1} />
+        <${VoxelCat} position=${[-7.5, 1.4, -21.0]} rotationY=${-0.1} furColor="#ff9800" accentColor="#fff3e0" phase=${1.9} />
+        <${VoxelBunny} position=${[-2.0, 1.4, -21.0]} rotationY=${0} furColor="#fff8e1" phase=${2.9} />
+        <${VoxelCat} position=${[8.5, 1.4, -21.0]} rotationY=${-0.2} furColor="#ffffff" accentColor="#78909c" phase=${1.4} />
+        <${VoxelDog} position=${[19.0, 1.4, -21.0]} rotationY=${-0.25} furColor="#e69b45" earColor="#8d5524" phase=${3.3} />
+      </group>
 
       <!-- 4. Mother Duck + Ducklings & Chill Capybara Swimming in the River! -->
       <${VoxelSwimmingDuck} startX=${-14} z=${3.4} speed=${1.1} phase=${0} isBaby=${false} />
@@ -1443,13 +1459,13 @@ function VoxelFestivalCrowd() {
     { pos: [16.2, 1.4, 21.1], rot: Math.PI - 0.25, shirt: '#ef5350', pants: '#212121', hold: true, phase: 4.2 },
     { pos: [23.0, 1.4, 21.0], rot: Math.PI, shirt: '#29b6f6', pants: '#263238', hold: false, phase: 1.1 },
 
-    // 3. People across the river on the North City Promenade (Z = -21.2) facing South (rot = 0)
-    { pos: [-20, 1.4, -21.0], rot: 0, shirt: '#ff4081', pants: '#1a237e', hold: true, phase: 0.5 },
-    { pos: [-11, 1.4, -21.0], rot: 0.2, shirt: '#ffd740', pants: '#212121', hold: false, phase: 1.7 },
-    { pos: [-4, 1.4, -21.0], rot: -0.1, shirt: '#00e5ff', pants: '#263238', hold: true, phase: 2.9 },
-    { pos: [6, 1.4, -21.0], rot: 0, shirt: '#69f0ae', pants: '#1a237e', hold: false, phase: 3.4 },
-    { pos: [15, 1.4, -21.0], rot: -0.2, shirt: '#ff80ab', pants: '#fff8e1', hold: true, phase: 1.3 },
-    { pos: [24, 1.4, -21.0], rot: 0.1, shirt: '#ffa726', pants: '#212121', hold: false, phase: 2.2 }
+    // 3. People across the river on the Expanded North City Promenade (Z = -40 + 8 = -32) facing South (rot = 0)
+    { pos: [-20, 1.4, -40.0], rot: 0, shirt: '#ff4081', pants: '#1a237e', hold: true, phase: 0.5 },
+    { pos: [-11, 1.4, -40.0], rot: 0.2, shirt: '#ffd740', pants: '#212121', hold: false, phase: 1.7 },
+    { pos: [-4, 1.4, -40.0], rot: -0.1, shirt: '#00e5ff', pants: '#263238', hold: true, phase: 2.9 },
+    { pos: [6, 1.4, -40.0], rot: 0, shirt: '#69f0ae', pants: '#1a237e', hold: false, phase: 3.4 },
+    { pos: [15, 1.4, -40.0], rot: -0.2, shirt: '#ff80ab', pants: '#fff8e1', hold: true, phase: 1.3 },
+    { pos: [24, 1.4, -40.0], rot: 0.1, shirt: '#ffa726', pants: '#212121', hold: false, phase: 2.2 }
   ], []);
 
   return html`
@@ -1584,13 +1600,13 @@ function Voxel360SurroundingCity() {
         </group>
       `)}
 
-      <!-- East & West Side Embankments & City Towers (Completing full 360° circle) -->
-      <mesh position=${[-55, 0.6, 0]}>
-        <boxGeometry args=${[10, 1.6, 56]} />
+      <!-- East & West Side Embankments & City Towers (Completing full 360° wide bay) -->
+      <mesh position=${[-55, 0.6, -10]}>
+        <boxGeometry args=${[10, 1.6, 86]} />
         <meshStandardMaterial color="#18204a" />
       </mesh>
-      <mesh position=${[55, 0.6, 0]}>
-        <boxGeometry args=${[10, 1.6, 56]} />
+      <mesh position=${[55, 0.6, -10]}>
+        <boxGeometry args=${[10, 1.6, 86]} />
         <meshStandardMaterial color="#18204a" />
       </mesh>
 
@@ -1690,11 +1706,11 @@ function VoxelViceSunsetHorizon() {
         <meshBasicMaterial color="#7209b7" side=${THREE.BackSide} fog=${false} transparent=${true} opacity=${0.36} />
       </mesh>
 
-      <!-- Palm Trees Lining Both the North Ocean Drive & South Beach Festival Walk -->
+      <!-- Palm Trees Lining Both the North Ocean Drive & South Beach Festival Walk (Expanded Wide Bay) -->
       ${[-38, -26, -15, 2, 14, 26, 38].map((px, i) => html`
         <${VoxelPalmTree}
           key=${'npalm-' + i}
-          position=${[px, 1.35, -21.8]}
+          position=${[px, 1.35, -32.8]}
           scale=${0.92}
           neonColor=${i % 2 === 0 ? '#ff2a85' : '#00f5d4'}
           lean=${i % 2 === 0 ? 0.12 : -0.1}
@@ -1703,7 +1719,7 @@ function VoxelViceSunsetHorizon() {
       ${[-32, -20, -9, 9, 20, 32].map((px, i) => html`
         <${VoxelPalmTree}
           key=${'spalm-' + i}
-          position=${[px, 1.35, 21.8]}
+          position=${[px, 1.35, 29.8]}
           scale=${0.95}
           neonColor=${i % 2 === 0 ? '#00f5d4' : '#ff2a85'}
           lean=${i % 2 === 0 ? -0.11 : 0.11}
@@ -2025,15 +2041,21 @@ function VoxelEnvironment({ onWaterClick }) {
         <pointLight color="#fff0b3" intensity=${10} distance=${140} />
       </group>
 
-      <!-- 3D Voxel Vice Beach Skyline + 360° Surrounding City, Crowd, Floating Pets & Throw Arc -->
-      <${VoxelCitySkyline} />
-      <${Voxel360SurroundingCity} />
-      <${VoxelFestivalCrowd} />
+      <!-- 3D Voxel Vice Beach Skyline (Expanded Wide Bay: North Bank Z=-35, South Bank Z=+32) -->
+      <group position=${[0, 0, -11]}>
+        <${VoxelCitySkyline} />
+      </group>
+      <group position=${[0, 0, 8]}>
+        <${Voxel360SurroundingCity} />
+      </group>
+      <group position=${[0, 0, 8]}>
+        <${VoxelFestivalCrowd} />
+      </group>
       <${VoxelCuteAnimals} />
       <${VoxelThrowTrajectory} />
 
-      <!-- Shore-Connected Thai Wooden Pier Bridge (สะพานท่าน้ำไม้สักเชื่อมต่อจากริมฝั่งถนนงานวัด Z=21 ยื่นลงสู่แม่น้ำ Z=12.5) -->
-      <group position=${[-14, 0, 16.5]}>
+      <!-- Shore-Connected Thai Wooden Pier Bridge (เชื่อมต่อจากริมฝั่งถนนงานวัด Z=29 ยื่นลงสู่แม่น้ำกว้าง Z=20.5) -->
+      <group position=${[-14, 0, 24.5]}>
         <!-- Main Wooden Walkway Deck connecting South Bank directly into the River -->
         <mesh position=${[0, 1.15, 0]} receiveShadow castShadow>
           <boxGeometry args=${[6.8, 0.45, 9.5]} />
@@ -2090,24 +2112,23 @@ function VoxelEnvironment({ onWaterClick }) {
         <pointLight position=${[0, 4.6, -4.2]} color="#ffcc80" intensity=${7} distance=${24} />
       </group>
 
-      <!-- 3D River Surface Plane (Supports Mouse & Mobile Touch Aiming + Charge-Throw) -->
+      <!-- 3D River Surface Plane (Expanded Wide Vice Beach Bay + Aim & Charge-Throw) -->
       <mesh
         ref=${waterRef}
-        position=${[0, -0.05, 0]}
+        position=${[0, -0.05, -2]}
         rotation=${[-Math.PI / 2, 0, 0]}
-        receiveShadow
         onPointerMove=${(e) => {
           if (window.loyState && window.loyState.throwMode && window.loyState.throwMode.active) {
             e.stopPropagation();
-            window.loyState.throwMode.aimX3D = Math.max(-18, Math.min(24, e.point.x));
-            window.loyState.throwMode.aimZ3D = Math.max(-14, Math.min(12, e.point.z));
+            window.loyState.throwMode.aimX3D = Math.max(-38, Math.min(38, e.point.x));
+            window.loyState.throwMode.aimZ3D = Math.max(-24, Math.min(18, e.point.z));
           }
         }}
         onPointerDown=${(e) => {
           if ((e.button === 0 || e.pointerType === 'touch') && window.loyState && window.loyState.throwMode && window.loyState.throwMode.active) {
             e.stopPropagation();
-            window.loyState.throwMode.aimX3D = Math.max(-18, Math.min(24, e.point.x));
-            window.loyState.throwMode.aimZ3D = Math.max(-14, Math.min(12, e.point.z));
+            window.loyState.throwMode.aimX3D = Math.max(-38, Math.min(38, e.point.x));
+            window.loyState.throwMode.aimZ3D = Math.max(-24, Math.min(18, e.point.z));
             window.loyState.throwMode.charging = true;
             window.loyState.throwMode.power = 0.15;
             window.loyState.throwMode.powerDir = 1;
@@ -2132,7 +2153,7 @@ function VoxelEnvironment({ onWaterClick }) {
           if (onWaterClick) onWaterClick(e.point);
         }}
       >
-        <planeGeometry args=${[120, 55, 24, 24]} />
+        <planeGeometry args=${[170, 88, 12, 12]} />
         <meshStandardMaterial
           color="#135685"
           emissive="#2d1259"
@@ -2308,8 +2329,9 @@ function CameraRig() {
       const followedId = window.loyState.followedKrathongId;
       if (followedId && window.loyState.krathongMap.has(followedId)) {
         const k = window.loyState.krathongMap.get(followedId);
-        const targetX = mapXTo3D(k.x);
-        const targetZ = LANE_Z[k.lane % 4] ?? 0;
+        const pos = getKrathongWorldPos(k);
+        const targetX = pos.x3d;
+        const targetZ = pos.z3d;
         const desiredTarget = new THREE.Vector3(targetX, 0.9, targetZ);
 
         if (zoomingToLockRef.current) {
@@ -2369,7 +2391,7 @@ function CameraRig() {
       maxPolarAngle=${Math.PI - 0.15}
       minPolarAngle=${0.05}
       minDistance=${2.5}
-      maxDistance=${75}
+      maxDistance=${95}
       onStart=${() => {
         // Stop initial auto-zoom so user can freely orbit 360° around the locked krathong
         zoomingToLockRef.current = false;
@@ -2379,28 +2401,36 @@ function CameraRig() {
 }
 
 // ============================================================================
-// 6. MAIN R3F WORLD SCENE
+// 6. MAIN R3F WORLD SCENE (Zero-Lag Versioned Sync + Optimized DPR)
 // ============================================================================
 function LoyKrathongR3FApp() {
   const [krathongs, setKrathongs] = useState([]);
   const [followedId, setFollowedId] = useState(null);
+  const lastVersionRef = useRef(-1);
+  const lastFollowedRef = useRef(null);
 
-  // Sync Krathong list from window.loyState
+  // Only trigger React re-render when a krathong is actually added/updated or camera lock changes!
   useEffect(() => {
     const timer = setInterval(() => {
-      if (window.loyState) {
+      if (!window.loyState) return;
+      const ver = window.loyState.krathongsVersion ?? window.loyState.krathongs.length;
+      if (ver !== lastVersionRef.current) {
+        lastVersionRef.current = ver;
         setKrathongs([...window.loyState.krathongs]);
+      }
+      if (window.loyState.followedKrathongId !== lastFollowedRef.current) {
+        lastFollowedRef.current = window.loyState.followedKrathongId;
         setFollowedId(window.loyState.followedKrathongId);
       }
-    }, 150);
+    }, 180);
     return () => clearInterval(timer);
   }, []);
 
-  const handleSelectKrathong = (entity) => {
+  const handleSelectKrathong = useCallback((entity) => {
     if (window.openInspectModal) {
       window.openInspectModal(entity);
     }
-  };
+  }, []);
 
   const [isPortrait, setIsPortrait] = useState(() => window.innerHeight > window.innerWidth);
 
@@ -2412,18 +2442,17 @@ function LoyKrathongR3FApp() {
 
   return html`
     <${Canvas}
-      shadows
-      dpr=${[1, 2]}
+      dpr=${[1, 1.5]}
       camera=${{
-        position: isPortrait ? [0, 12.5, 29] : [0, 9.5, 21],
-        fov: isPortrait ? 58 : 46
+        position: isPortrait ? [0, 15.5, 36] : [0, 11.5, 28],
+        fov: isPortrait ? 58 : 48
       }}
       gl=${{ antialias: false, toneMappingExposure: 1.45, powerPreference: 'high-performance' }}
     >
       <color attach="background" args=${['#280e4a']} />
-      <fog attach="fog" args=${['#3d1466', 44, 105]} />
+      <fog attach="fog" args=${['#3d1466', 54, 128]} />
 
-      <${Stars} radius=${65} depth=${30} count=${1400} factor=${4.5} saturation=${0.85} fade speed=${1.2} />
+      <${Stars} radius=${75} depth=${35} count=${900} factor=${4.5} saturation=${0.85} fade speed=${1.0} />
 
       <${CameraRig} />
       <${VoxelEnvironment} />
